@@ -1,0 +1,4 @@
+interface:
+  display_name: "Humanize YLW — Korean Humanities Writing Engine"
+  short_description: "저자의 논지와 개념을 보존하는 한국어 인문학 윤문"
+  default_prompt: "Use $humanize-ylw to revise this Korean manuscript while preserving its argument, concepts, citations, and authorial register."

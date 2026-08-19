@@ -1,0 +1,15 @@
+version: YLW 0.1.0
+profile: auto
+intensity: conservative
+preserve_argument: strict
+preserve_terms: strict
+preserve_citations: strict
+preserve_numbers: strict
+allow_paragraph_reorder: false
+allow_claim_deletion: false
+allow_claim_addition: false
+generate_new_examples: false
+generate_new_metaphors: false
+profile_defaults:
+  humanities-book: standard
+  column: standard

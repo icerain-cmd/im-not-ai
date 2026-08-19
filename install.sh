@@ -29,7 +29,7 @@ Usage: ./install.sh [options]
 
   설치된 CLI를 자동 감지해 humanize-korean 스킬을 전역 설치한다.
   Claude: ~/skills/{humanize-korean,humanize,humanize-redo} + ~/.claude/agents/*.md
-  Codex : ~/.codex/skills/humanize-korean
+  Codex : ~/.codex/skills/{humanize-korean,humanize-ylw}
   Gemini: gemini extensions link (gemini-extension.json + GEMINI.md + commands/)
 
 Options:
@@ -74,6 +74,9 @@ prepare_target() {
   if [ -L "$dest" ]; then
     if [ "$(readlink "$dest")" = "$src" ]; then
       echo "ok (already linked): $dest"; return 1
+    fi
+    if [ "$FORCE" != 1 ]; then
+      echo "refuse: $dest 가 다른 심링크임 (--force 로 백업 후 덮어쓰기)"; return 2
     fi
     run mv "$dest" "$dest.bak.$TS"
   elif [ -e "$dest" ]; then
@@ -133,7 +136,18 @@ install_one() {
   [ "$rc" = 2 ] && return 1
   case "$MODE" in
     symlink) run ln -s "$src" "$dest" ;;
-    copy)    run cp -RL "$src" "$dest" ;;   # -L: references 심링크를 실체로 복사
+    copy)
+      run cp -RL "$src" "$dest"   # -L: references 심링크를 실체로 복사
+      # drvfs가 symlink를 일반 파일(상대 대상 문자열)로 checkout한 경우 실체화한다.
+      if [ "$DRYRUN" != 1 ] && [ "$src" = "$REPO/codex/skills/humanize-korean" ] \
+          && [ -f "$dest/references" ] && [ ! -d "$dest/references" ]; then
+        portable_ref="$(sed -n '1p' "$dest/references")"
+        if [ "$portable_ref" = "../../../skills/humanize-korean/references" ]; then
+          rm "$dest/references"
+          cp -R "$REPO/skills/humanize-korean/references" "$dest/references"
+        fi
+      fi
+      ;;
   esac
   echo "installed: $dest"
 }
@@ -184,7 +198,9 @@ fi
 if [ "$DO_CODEX" != no ] && { [ "$DO_CODEX" = yes ] || has_codex_target; }; then
   echo "== Codex =="
   run mkdir -p "$CODEX_HOME/skills"
-  install_one "$REPO/codex/skills/humanize-korean" "$CODEX_HOME/skills/humanize-korean"
+  for s in humanize-korean humanize-ylw; do
+    install_one "$REPO/codex/skills/$s" "$CODEX_HOME/skills/$s"
+  done
 else
   echo "== Codex: 건너뜀 (codex 또는 $CODEX_HOME 미감지) =="
 fi
@@ -206,7 +222,7 @@ fi
 echo ""
 echo "완료 (mode=$MODE)."
 echo "  Claude: 새 세션에서 /humanize-korean (또는 /humanize)"
-echo "  Codex : \$humanize-korean"
+echo "  Codex : \$humanize-korean · \$humanize-ylw"
 echo "  Gemini: 새 세션에서 /humanize-korean (또는 /humanize)"
 echo "  업데이트: ./update.sh (새 버전 자동 감지 + 적용) · 제거: ./uninstall.sh"
 exit 0
