@@ -28,9 +28,9 @@ Upstream `im-not-ai` 2.3.2의 README, 설치 스크립트, Claude/Codex/Gemini �
 
 - YLW Style Constitution과 보호 용어 사용자 확장 파일
 - `academic`, `academic-book`, `humanities-book`, `column`, `official`, `social` 프로필
-- YLW-A~L taxonomy와 `academic_overhumanization`, `concept_drift`
+- YLW-A~O taxonomy와 adaptive intensity, conclusion rhythm, semantic flattening, generated-pattern 검사
 - `SAFE`/`REVIEW`/`RISK`, RISK 원문 롤백, 분리 보고서
-- 보수적 자동 프로필 라우터와 YLW Style Score
+- 보수적 자동 프로필 라우터와 Integrity / Style Improvement / Author Fidelity 분리 평가
 
 ## 과윤문 위험
 

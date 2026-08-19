@@ -26,13 +26,13 @@ Fast-forward가 불가능하면 feature branch에서 `upstream/main`을 merge하
 - `install.sh`: Codex 설치 대상 목록
 - `README.md`와 `INSTALL.md`: upstream 설치 설명(개인화 문서는 `README-YLW.md`에 격리)
 - `codex/skills/humanize-korean/references`: R:의 symlink 비호환 표현
-- plugin manifest와 version tests: upstream 버전은 YLW 0.1.0과 독립적으로 유지
+- plugin manifest와 version tests: upstream 버전은 YLW 0.2.x와 독립적으로 유지
 
 ## 업데이트 후 검증
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_*.py'
-python3 -m unittest tests.test_ylw
+python3 -m unittest discover -s tests -p 'test_ylw.py'
 bash tests/test_install_flags.sh
 ```
 
