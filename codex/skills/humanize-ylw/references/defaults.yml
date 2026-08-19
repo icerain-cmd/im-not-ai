@@ -1,6 +1,7 @@
-version: YLW 0.1.0
+version: YLW 0.2.0
 profile: auto
 intensity: conservative
+adaptive: true
 preserve_argument: strict
 preserve_terms: strict
 preserve_citations: strict

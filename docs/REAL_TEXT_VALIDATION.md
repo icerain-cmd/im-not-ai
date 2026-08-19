@@ -1,4 +1,4 @@
-# YLW 0.1.0 Real-text Validation
+# YLW 0.2.0 Real-text Validation
 
 아래 네 시나리오는 `profile_router.py`와 `integrity_check.py`로 실제 검증했다. 예시는 기능 검증용 자체 작성 문장이다.
 
@@ -54,6 +54,16 @@
 **Integrity**: 날짜, 수치, 책임 주체, 의무의 시제 보존.
 **Why**: 행정적 정보를 추가하지 않고 두 문장을 연결했다.
 
+## 0.2 evidence 재검증
+
+동일한 비공개 로컬 원고로 0.2 deterministic gate를 재실행했다. 실제 원문은 저장소에 포함하지 않았다.
+
+- Academic: SAFE, Integrity 100, Author Fidelity HIGH, generated pattern 없음.
+- Humanities book: SAFE 8 / REVIEW 4 / RISK 0. `투영` 변경과 결론 리듬 변경이 구체적 REVIEW 사유로 승격됐다.
+- Column: Integrity 100을 유지하면서 기존 후보가 새로 만든 forced contrast와 choppy emphasis를 탐지했다.
+
+상세 비교는 [YLW_0.2_VALIDATION.md](YLW_0.2_VALIDATION.md)를 참조한다.
+
 ## 판정 해석
 
-결정적 token 손실은 `RISK`로 처리되어 원문으로 롤백된다. 변화량이나 문장 재구성이 크지만 무결성이 유지되면 `REVIEW`로 남겨 저자 확인을 요구한다. `SAFE`는 자동 승인이 아니라 엄격한 결정적 검사 통과를 뜻한다.
+결정적 token 손실은 `RISK`로 처리되어 원문으로 롤백된다. 변화량이나 문장 재구성이 크지만 무결성이 유지되면 `REVIEW`로 남겨 저자 확인을 요구한다. `SAFE`는 자동 승인이 아니라 무결성과 저자 충실성 위험이 낮다는 뜻이다.
