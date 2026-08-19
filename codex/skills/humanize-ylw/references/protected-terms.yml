@@ -1,0 +1,16 @@
+protected_terms:
+  exact:
+    - 기계세
+    - Mechanocene
+    - 인공자연
+    - 에코 디지털
+    - 기술생성시대
+    - 기술생성매체미학
+    - WE
+    - Whole Emergent
+    - 작동적 자율성
+    - 감각 민주주의
+    - 공감의 네트워크
+    - 공진 주체
+  preserve_repetition: true
+  synonym_replacement: false
