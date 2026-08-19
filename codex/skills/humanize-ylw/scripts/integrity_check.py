@@ -4,23 +4,26 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import os
 import re
+import tempfile
 from collections import Counter
 from pathlib import Path
 
-NUMBER = re.compile(r"(?<![A-Za-z가-힣])[-+]?\d[\d,]*(?:\.\d+)?%?(?![A-Za-z가-힣])")
+NUMBER = re.compile(r"(?<![A-Za-z0-9])[-+]?\d[\d,]*(?:\.\d+)?%?")
 DATE = re.compile(r"(?:\d{4}[./-]\d{1,2}[./-]\d{1,2}|\d{4}년(?:\s*\d{1,2}월(?:\s*\d{1,2}일)?)?)")
 URL_DOI = re.compile(r"(?:https?://\S+|doi:\s*\S+|10\.\d{4,9}/\S+)", re.I)
-QUOTE = re.compile(r"[\"“](.*?)[\"”]|[「『](.*?)[」』]", re.S)
+QUOTE = re.compile(r"[\"“](.*?)[\"”]|[‘](.*?)[’]|[「『](.*?)[」』]", re.S)
 ABBR = re.compile(r"\b[A-Z][A-Z0-9-]{1,}\b")
 MARKDOWN_REGION = re.compile(
     r"```[\s\S]*?```|`[^`\n]+`|<!--[\s\S]*?-->|^>[^\n]*$|^\[\^[^]]+\]:[^\n]*$|\[\^[^]]+\]|^\|[^\n]*\|\s*$",
     re.MULTILINE,
 )
 NEGATION = re.compile(r"않|아니|없|못하|불가능|금지")
-CAUSAL = re.compile(r"때문|따라서|그러므로|초래|야기|인과")
+CAUSAL = re.compile(r"때문|따라서|그러므로|초래|야기|인과|원인")
 CONDITION = re.compile(r"경우|조건|한에서|라면|예외|다만")
-QUALIFIER = re.compile(r"일부|대체로|가능성|수 있다|보인다|추정|제한적")
+QUALIFIER = re.compile(r"일부|대체로|가능성|가능하|수 있다|보인다|추정|제한적")
+CERTAINTY = re.compile(r"반드시|모두|확실|단정")
 SENTENCE = re.compile(r"(?<=[.!?다요])\s+|\n+")
 
 
@@ -43,6 +46,13 @@ def tokens(pattern: re.Pattern[str], text: str) -> Counter[str]:
         value = next((g for g in match.groups() if g is not None), match.group(0))
         found.append(value)
     return Counter(found)
+
+
+def token_sequence(pattern: re.Pattern[str], text: str) -> list[str]:
+    result = []
+    for match in pattern.finditer(text):
+        result.append(next((g for g in match.groups() if g is not None), match.group(0)))
+    return result
 
 
 def paragraphs(text: str) -> list[str]:
@@ -72,7 +82,7 @@ def evaluate(before: str, after: str, terms: list[str], intensity: str) -> dict[
     for name, pattern in (("numbers", NUMBER), ("dates", DATE), ("citations", URL_DOI),
                           ("quotes", QUOTE), ("abbreviations", ABBR), ("markdown_regions", MARKDOWN_REGION)):
         a, b = tokens(pattern, before), tokens(pattern, after)
-        checks[name] = a == b
+        checks[name] = a == b and token_sequence(pattern, before) == token_sequence(pattern, after)
         details[name] = {"missing": list((a - b).elements()), "added": list((b - a).elements())}
     frontmatter = re.compile(r"\A---\s*\n.*?\n---\s*(?:\n|\Z)", re.S)
     a_front, b_front = tokens(frontmatter, before), tokens(frontmatter, after)
@@ -82,8 +92,20 @@ def evaluate(before: str, after: str, terms: list[str], intensity: str) -> dict[
     after_terms = Counter({term: after.count(term) for term in before_terms})
     checks["protected_terms"] = before_terms == after_terms
     details["protected_terms"] = {"missing_or_changed": [t for t in before_terms if before_terms[t] != after_terms[t]]}
+    protected_pattern = re.compile(
+        "|".join([NUMBER.pattern, DATE.pattern, URL_DOI.pattern, QUOTE.pattern, ABBR.pattern]
+                 + [re.escape(term) for term in terms]),
+        re.I | re.S,
+    )
+    protected_context_before = Counter(
+        sentence.strip() for sentence in SENTENCE.split(before) if protected_pattern.search(sentence)
+    )
+    protected_context_after = Counter(
+        sentence.strip() for sentence in SENTENCE.split(after) if protected_pattern.search(sentence)
+    )
+    context_changed = protected_context_before != protected_context_after
     for name, pattern in (("negation", NEGATION), ("causality", CAUSAL),
-                          ("conditions", CONDITION), ("qualifiers", QUALIFIER)):
+                          ("conditions", CONDITION), ("qualifiers", QUALIFIER), ("certainty", CERTAINTY)):
         delta = len(pattern.findall(after)) - len(pattern.findall(before))
         checks[name] = delta == 0
         details[name] = {"count_delta": delta}
@@ -97,23 +119,36 @@ def evaluate(before: str, after: str, terms: list[str], intensity: str) -> dict[
     reorder_count = paragraph_reorders(before, after)
     limits = {"conservative": 0.15, "standard": 0.25, "deep": 0.35}
     hard_fail = [k for k in ("numbers", "dates", "citations", "quotes", "abbreviations", "markdown_regions", "frontmatter", "protected_terms",
-                              "negation", "causality", "conditions", "qualifiers") if not checks[k]]
+                              "negation", "causality", "conditions", "qualifiers", "certainty") if not checks[k]]
+    review_reasons = []
+    if context_changed:
+        review_reasons.append("protected-token sentence context changed")
+    if lexical > limits[intensity]:
+        review_reasons.append(f"lexical change exceeds {intensity} limit")
+    if para_delta != 0:
+        review_reasons.append("paragraph count changed")
+    if reorder_count != 0:
+        review_reasons.append("preserved paragraphs reordered")
+    if restructure > 0.34:
+        review_reasons.append("sentence restructure rate exceeds 34%")
     if hard_fail:
         status = "RISK"
-    elif lexical > limits[intensity] or para_delta != 0 or reorder_count != 0 or restructure > 0.34:
+    elif review_reasons:
         status = "REVIEW"
     else:
         status = "SAFE"
     return {"status": status, "checks": checks, "details": details,
             "lexical_change_rate": round(lexical, 4), "sentence_restructure_rate": round(restructure, 4),
             "paragraph_count_delta": para_delta, "paragraph_reorder_count": reorder_count, "hard_failures": hard_fail,
+            "protected_context_changed": context_changed,
+            "review_reasons": review_reasons,
             "claims": "PASS" if not hard_fail else "RISK", "ylw_style_score": score(checks, lexical, limits[intensity])}
 
 
 def score(checks: dict[str, bool], lexical: float, limit: float) -> int:
     integrity = sum(checks[k] for k in ("numbers", "dates", "citations", "quotes", "abbreviations", "markdown_regions", "frontmatter")) / 7
     concepts = float(checks["protected_terms"])
-    argument = sum(checks[k] for k in ("negation", "causality", "conditions", "qualifiers")) / 4
+    argument = sum(checks[k] for k in ("negation", "causality", "conditions", "qualifiers", "certainty")) / 5
     base = 25 * integrity + 20 * concepts + 15 * argument + 15 + 10 + 5 + 5
     return round(min(100, base + (5 if 0 < lexical <= limit else 0)))
 
@@ -133,13 +168,14 @@ Status: {result['status']}
 - Protected terms: {'PASS' if c['protected_terms'] else 'FAIL'}
 - Dates / abbreviations: {'PASS' if c['dates'] and c['abbreviations'] else 'FAIL'}
 - Markdown never-touch regions: {'PASS' if c['markdown_regions'] and c['frontmatter'] else 'FAIL'}
-- Negation / causality / conditions / qualifiers: {'PASS' if all(c[k] for k in ('negation','causality','conditions','qualifiers')) else 'FAIL'}
+- Negation / causality / conditions / qualifiers / certainty: {'PASS' if all(c[k] for k in ('negation','causality','conditions','qualifiers','certainty')) else 'FAIL'}
 
 ## Changes
 - Lexical change rate: {result['lexical_change_rate']:.1%}
 - Sentence restructure rate: {result['sentence_restructure_rate']:.1%}
 - Paragraph count delta: {result['paragraph_count_delta']}
 - Paragraph reorder count: {result['paragraph_reorder_count']}
+- Protected-token context changed: {result['protected_context_changed']}
 
 ## Detected patterns
 - Deterministic integrity gate only; contextual YLW patterns are recorded by the editing agent.
@@ -149,6 +185,7 @@ Status: {result['status']}
 
 ## Possible over-edit risks
 - Hard failures: {', '.join(result['hard_failures']) if result['hard_failures'] else 'none'}
+- Review reasons: {', '.join(result['review_reasons']) if result['review_reasons'] else 'none'}
 
 ## Final grade
 - Status: {result['status']}
@@ -170,13 +207,48 @@ def main() -> int:
     after = Path(args.after).read_text(encoding="utf-8")
     result = evaluate(before, after, protected_terms(Path(args.protected)), args.intensity)
     body = before if result["status"] == "RISK" else after
-    if args.final:
-        Path(args.final).write_text(body, encoding="utf-8")
     rendered = report(result, args.profile, args.intensity)
-    if args.report:
-        Path(args.report).write_text(rendered, encoding="utf-8")
+    inputs = {Path(value).resolve() for value in (args.before, args.after, args.protected)}
+    outputs = [Path(value) for value in (args.final, args.report) if value]
+    try:
+        resolved_outputs = [_validate_output(path, Path.cwd().resolve(), inputs) for path in outputs]
+        if len(set(resolved_outputs)) != len(resolved_outputs):
+            raise ValueError("final/report output paths must be distinct")
+        if args.final:
+            _atomic_write(Path(args.final), body)
+        if args.report:
+            _atomic_write(Path(args.report), rendered)
+    except (OSError, ValueError) as exc:
+        print(f"error: unsafe output path: {exc}")
+        return 3
     print(result["status"])
     return {"SAFE": 0, "REVIEW": 1, "RISK": 2}[result["status"]]
+
+
+def _validate_output(path: Path, workspace: Path, inputs: set[Path]) -> Path:
+    if path.is_symlink():
+        raise ValueError(f"symlink output rejected: {path}")
+    resolved = path.resolve()
+    if resolved.parent != workspace:
+        raise ValueError(f"output must be directly inside workspace {workspace}: {path}")
+    if resolved in inputs:
+        raise ValueError(f"output aliases an input: {path}")
+    if path.exists() and not path.is_file():
+        raise ValueError(f"output is not a regular file: {path}")
+    return resolved
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+        temporary = Path(handle.name)
+        handle.write(content)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
 
 if __name__ == "__main__":

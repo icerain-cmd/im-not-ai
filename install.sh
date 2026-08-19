@@ -75,6 +75,9 @@ prepare_target() {
     if [ "$(readlink "$dest")" = "$src" ]; then
       echo "ok (already linked): $dest"; return 1
     fi
+    if [ "$FORCE" != 1 ]; then
+      echo "refuse: $dest 가 다른 심링크임 (--force 로 백업 후 덮어쓰기)"; return 2
+    fi
     run mv "$dest" "$dest.bak.$TS"
   elif [ -e "$dest" ]; then
     if [ "$FORCE" != 1 ]; then
@@ -133,7 +136,18 @@ install_one() {
   [ "$rc" = 2 ] && return 1
   case "$MODE" in
     symlink) run ln -s "$src" "$dest" ;;
-    copy)    run cp -RL "$src" "$dest" ;;   # -L: references 심링크를 실체로 복사
+    copy)
+      run cp -RL "$src" "$dest"   # -L: references 심링크를 실체로 복사
+      # drvfs가 symlink를 일반 파일(상대 대상 문자열)로 checkout한 경우 실체화한다.
+      if [ "$DRYRUN" != 1 ] && [ "$src" = "$REPO/codex/skills/humanize-korean" ] \
+          && [ -f "$dest/references" ] && [ ! -d "$dest/references" ]; then
+        portable_ref="$(sed -n '1p' "$dest/references")"
+        if [ "$portable_ref" = "../../../skills/humanize-korean/references" ]; then
+          rm "$dest/references"
+          cp -R "$REPO/skills/humanize-korean/references" "$dest/references"
+        fi
+      fi
+      ;;
   esac
   echo "installed: $dest"
 }

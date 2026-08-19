@@ -11,7 +11,7 @@ AI detector 우회가 아니라 한국어 인문학 연구자의 논지·개념�
 ./install.sh --codex-only
 ```
 
-R:처럼 symlink를 지원하지 않는 파일시스템에서는 `./install.sh --codex-only --copy`를 사용한다.
+R:처럼 symlink를 지원하지 않는 파일시스템에서는 최초 설치에 `./install.sh --codex-only --copy`를 사용한다. 기존 copy 설치본을 main 기준으로 갱신할 때는 설치기가 `.bak.<timestamp>`로 백업하도록 `./install.sh --codex-only --copy --force`를 사용한다.
 
 ## 사용법
 
@@ -37,6 +37,10 @@ _workspace/{run_id}/report.md
 ## Upstream 동기화
 
 [docs/UPSTREAM_SYNC.md](docs/UPSTREAM_SYNC.md)를 따른다. `origin` 사용자 포크가 유일한 Source of Truth이며 R: clone은 작업 복사본이다.
+
+설치된 `humanize-ylw` 파일을 직접 수정하지 않는다. 모든 수정은 GitHub source repository의 feature branch에서 수행하고 main 병합 후 `./install.sh --codex-only --copy --force`로 다시 설치한다.
+
+YLW 버전의 Source of Truth는 `codex/skills/humanize-ylw/references/defaults.yml`의 `version` 값이다. upstream `im-not-ai` 버전과 독립적으로 관리한다.
 
 ## 알려진 한계
 

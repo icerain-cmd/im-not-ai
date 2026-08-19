@@ -41,6 +41,19 @@ assert_contains "$codex_output" "+ ln -s $ROOT/codex/skills/humanize-ylw $TMP_HO
 assert_not_contains "$codex_output" "Codex: "
 rm -rf "$TMP_HOME/.codex"
 
+mkdir -p "$TMP_HOME/.codex/skills"
+ln -s /foreign/humanize-ylw "$TMP_HOME/.codex/skills/humanize-ylw"
+set +e
+foreign_link_output="$(run_installer --codex-only 2>&1)"
+foreign_link_rc=$?
+set -e
+if [ "$foreign_link_rc" -eq 0 ]; then
+  echo "expected foreign symlink collision to fail" >&2
+  exit 1
+fi
+assert_contains "$foreign_link_output" "다른 심링크임"
+rm -rf "$TMP_HOME/.codex"
+
 claude_without_target_output="$(run_installer --claude-only)"
 assert_contains "$claude_without_target_output" "== Claude Code: 건너뜀"
 assert_not_contains "$claude_without_target_output" "+ ln -s $ROOT/skills/humanize-korean"
